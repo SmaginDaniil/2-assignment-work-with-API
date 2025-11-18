@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { getArticles } from "../services/api";
 
 function ArticleList({ onSelectArticle }) {
   const [articles, setArticles] = useState([]);
@@ -7,8 +7,8 @@ function ArticleList({ onSelectArticle }) {
 
   const fetchArticles = async () => {
     try {
-      const res = await axios.get("http://localhost:4000/articles");
-      setArticles(res.data);
+      const res = await getArticles();
+      setArticles(res);
       setError("");
     } catch (err) {
       setError("Failed to load articles.");
@@ -29,15 +29,7 @@ function ArticleList({ onSelectArticle }) {
       ) : (
         <ul style={{ listStyle: "none", padding: 0 }}>
           {articles.map((article) => (
-            <li
-              key={article.id}
-              onClick={() => onSelectArticle(article.id)}
-              style={{
-                cursor: "pointer",
-                padding: "8px",
-                borderBottom: "1px solid #ddd",
-              }}
-            >
+            <li key={article.id} onClick={() => onSelectArticle(article.id)} style={{ cursor: "pointer", padding: "8px", borderBottom: "1px solid #ddd" }}>
               {article.title}
             </li>
           ))}

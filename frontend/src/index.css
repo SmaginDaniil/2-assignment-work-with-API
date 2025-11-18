@@ -1,0 +1,137 @@
+:root {
+  --bg: #f4f6f8;
+  --card: #ffffff;
+  --muted: #6b7280;
+  --accent: #2563eb;
+  --accent-contrast: #fff;
+}
+* {
+  box-sizing: border-box;
+  font-family: Inter, system-ui, Segoe UI, Roboto, "Helvetica Neue", Arial;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: #0f172a;
+}
+.app-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
+  padding: 20px;
+  min-height: 100vh;
+}
+.panel {
+  background: var(--card);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 1px 2px rgba(2, 6, 23, 0.06);
+}
+.article-list h2,
+.article-form h2,
+.article-view h2 {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+}
+.article-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.article-list li {
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.article-list li:hover {
+  background: #f1f5f9;
+}
+.article-form input[type="text"],
+.article-view input,
+.article-view textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #e6edf3;
+  border-radius: 6px;
+}
+.article-content {
+  background: #fbfdff;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #eef2f6;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  cursor: pointer;
+}
+.btn.secondary {
+  background: #e6eefc;
+  color: var(--accent);
+  border: 1px solid #dbeafe;
+}
+.controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.attachments {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.attachment-link {
+  display: inline-block;
+  padding: 6px 10px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  color: #0f172a;
+  text-decoration: none;
+}
+.notifications {
+  position: relative;
+  margin-bottom: 12px;
+}
+.notification {
+  background: #fff3cd;
+  border: 1px solid #ffeeba;
+  padding: 8px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.editor-block {
+  margin-bottom: 28px;
+}
+.editor-block .ql-container {
+  border-radius: 8px;
+  position: relative;
+  z-index: 0;
+}
+.editor-block .ql-toolbar {
+  position: relative;
+  z-index: 0;
+}
+.attach-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 80px;
+  position: relative;
+  clear: both;
+  width: 100%;
+}
+.attach-row .btn {
+  pointer-events: auto;
+}
+.form-actions {
+  margin-top: 12px;
+  clear: both;
+}

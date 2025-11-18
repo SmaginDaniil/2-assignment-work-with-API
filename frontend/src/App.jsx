@@ -14,7 +14,10 @@ function App() {
     ws.onmessage = (evt) => {
       try {
         const data = JSON.parse(evt.data);
-        setNotifications((n) => [{ ...data, receivedAt: Date.now() }, ...n].slice(0, 5));
+        setNotifications((n) => {
+          const added = [{ ...data, receivedAt: Date.now() }, ...n].slice(0, 8);
+          return added;
+        });
         if (data.type === "article_updated" || data.type === "attachment_added") {
           setRefreshKey((k) => k + 1);
         }
@@ -26,42 +29,31 @@ function App() {
     return () => ws.close();
   }, []);
 
+  useEffect(() => {
+    if (!notifications.length) return;
+    const timers = notifications.map((n, idx) =>
+      setTimeout(() => setNotifications((cur) => cur.filter((c) => c !== n)), 6000 + idx * 500)
+    );
+    return () => timers.forEach((t) => clearTimeout(t));
+  }, [notifications]);
+
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 2fr",
-        gap: "20px",
-        padding: "20px",
-      }}
-    >
-      <div>
-        <ArticleList
-          key={refreshKey}
-          onSelectArticle={(id) => setSelectedArticle(id)}
-        />
-        <ArticleForm onArticleCreated={() => setRefreshKey((k) => k + 1)} />
-      </div>
-      <div>
-        <div style={{ position: "relative" }}>
-          <div style={{ marginBottom: 10 }}>
-            {notifications.map((n, i) => (
-              <div
-                key={i}
-                style={{
-                  background: "#fff8c6",
-                  border: "1px solid #f0e68c",
-                  padding: "8px",
-                  borderRadius: 6,
-                  marginBottom: 6,
-                }}
-              >
-                <strong>{n.type}</strong>: {n.message}
-              </div>
-            ))}
-          </div>
-          <ArticleView articleId={selectedArticle} refreshKey={refreshKey} />
+    <div className="app-grid">
+      <div className="panel">
+        <ArticleList key={refreshKey} onSelectArticle={(id) => setSelectedArticle(id)} />
+        <div style={{ marginTop: 12 }}>
+          <ArticleForm onArticleCreated={() => setRefreshKey((k) => k + 1)} />
         </div>
+      </div>
+      <div className="panel">
+        <div className="notifications">
+          {notifications.map((n, i) => (
+            <div key={i} className="notification">
+              <strong>{n.type}</strong>: {n.message}
+            </div>
+          ))}
+        </div>
+        <ArticleView articleId={selectedArticle} refreshKey={refreshKey} />
       </div>
     </div>
   );
