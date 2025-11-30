@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
@@ -7,6 +8,7 @@ const { v4: uuidv4 } = require("uuid");
 const multer = require("multer");
 const http = require("http");
 const WebSocket = require("ws");
+const { sequelize, Article } = require("./models");
 
 const app = express();
 const PORT = 4000;
@@ -51,6 +53,7 @@ const upload = multer({
   },
 });
 
+// file-based persistence functions kept for backward compatibility
 const getArticlePath = (id) => path.join(DATA_DIR, `${id}.json`);
 const readArticleFile = (id) => {
   const filePath = getArticlePath(id);
@@ -58,39 +61,37 @@ const readArticleFile = (id) => {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 };
 
-app.get("/articles", (req, res) => {
-  const files = fs.readdirSync(DATA_DIR);
-  const articles = files.map((file) => {
-    const content = fs.readFileSync(path.join(DATA_DIR, file), "utf8");
-    const { id, title } = JSON.parse(content);
-    return { id, title };
-  });
-  res.json(articles);
-});
-
-app.get("/articles/:id", (req, res) => {
-  const article = readArticleFile(req.params.id);
-  if (!article) {
-    return res.status(404).json({ error: "Article not found." });
+app.get("/articles", async (req, res) => {
+  try {
+    const articles = await Article.findAll({ attributes: ["id", "title"], order: [["createdAt", "DESC"]] });
+    res.json(articles);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch articles." });
   }
-  res.json(article);
 });
 
-app.post("/articles", (req, res) => {
+app.get("/articles/:id", async (req, res) => {
+  try {
+    const article = await Article.findByPk(req.params.id);
+    if (!article) return res.status(404).json({ error: "Article not found." });
+    res.json(article);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch article." });
+  }
+});
+
+app.post("/articles", async (req, res) => {
   const { title, content } = req.body;
-
-  if (!title || !content) {
-    return res.status(400).json({ error: "Title and content are required." });
+  if (!title || !content) return res.status(400).json({ error: "Title and content are required." });
+  try {
+    const article = await Article.create({ title, content });
+    res.status(201).json({ message: "Article created successfully.", id: article.id });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to create article." });
   }
-
-  const id = uuidv4();
-  const article = { id, title, content, attachments: [] };
-  fs.writeFileSync(getArticlePath(id), JSON.stringify(article, null, 2));
-
-  res.status(201).json({ message: "Article created successfully.", id });
 });
 
-app.put("/articles/:id", (req, res) => {
+app.put("/articles/:id", async (req, res) => {
   const { id } = req.params;
   const { title, content } = req.body;
 
@@ -98,30 +99,28 @@ app.put("/articles/:id", (req, res) => {
     return res.status(400).json({ error: "Title and content are required." });
   }
 
-  const filePath = getArticlePath(id);
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: "Article not found." });
+  try {
+    const article = await Article.findByPk(id);
+    if (!article) return res.status(404).json({ error: "Article not found." });
+    article.title = title;
+    article.content = content;
+    await article.save();
+    broadcast({ type: "article_updated", id, message: "Article updated" });
+    res.json({ message: "Article updated successfully." });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update article." });
   }
-
-  const existing = JSON.parse(fs.readFileSync(filePath, "utf8"));
-  const updatedArticle = { id, title, content, attachments: existing.attachments || [] };
-  fs.writeFileSync(filePath, JSON.stringify(updatedArticle, null, 2));
-
-  broadcast({ type: "article_updated", id, message: "Article updated" });
-
-  res.json({ message: "Article updated successfully." });
 });
 
-app.delete("/articles/:id", (req, res) => {
+app.delete("/articles/:id", async (req, res) => {
   const { id } = req.params;
-  const filePath = getArticlePath(id); 
-
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: "Article not found." });
+  try {
+    const affected = await Article.destroy({ where: { id } });
+    if (!affected) return res.status(404).json({ error: "Article not found." });
+    res.json({ message: "Article deleted successfully." });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to delete article." });
   }
-
-  fs.unlinkSync(filePath);
-  res.json({ message: "Article deleted successfully." });
 });
 
 app.get("/", (req, res) => {
@@ -147,14 +146,14 @@ wss.on("connection", (ws) => {
   });
 });
 
-app.post("/articles/:id/attachments", upload.single("file"), (req, res) => {
+app.post("/articles/:id/attachments", upload.single("file"), async (req, res) => {
   const { id } = req.params;
   const file = req.file;
   if (!file) {
     return res.status(400).json({ error: "No file uploaded or invalid file type." });
   }
 
-  const article = readArticleFile(id);
+  const article = await Article.findByPk(id);
   if (!article) {
     fs.unlinkSync(file.path);
     return res.status(404).json({ error: "Article not found." });
@@ -168,15 +167,27 @@ app.post("/articles/:id/attachments", upload.single("file"), (req, res) => {
     size: file.size,
   };
 
-  article.attachments = article.attachments || [];
-  article.attachments.push(attachment);
-  fs.writeFileSync(getArticlePath(id), JSON.stringify(article, null, 2));
+  article.attachments = (article.attachments || []).concat([attachment]);
+  await article.save();
 
   broadcast({ type: "attachment_added", id, message: `Attachment ${attachment.originalname} added` });
 
   res.status(201).json({ message: "Attachment uploaded.", attachment });
 });
 
-server.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-});
+(async function startServer() {
+  try {
+    await sequelize.authenticate();
+    console.log('Database connected');
+    if (process.env.SYNC_DB === 'true') {
+      await sequelize.sync({ alter: true });
+      console.log('Database synchronized (sync)');
+    }
+  } catch (err) {
+    console.error('Database connection failed', err);
+  } finally {
+    server.listen(PORT, () => {
+      console.log(`Server is running on http://localhost:${PORT}`);
+    });
+  }
+})();

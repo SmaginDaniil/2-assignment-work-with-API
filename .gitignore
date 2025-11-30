@@ -8,6 +8,7 @@
 /backend/uploads
 /backend/data
 /frontend/.env
+/.env
 
 npm-debug.log
 yarn-debug.log
