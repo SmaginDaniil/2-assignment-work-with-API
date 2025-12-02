@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { getArticles } from "../services/api";
 
-function ArticleList({ onSelectArticle }) {
+function ArticleList({ onSelectArticle, workspaceId }) {
   const [articles, setArticles] = useState([]);
   const [error, setError] = useState("");
 
   const fetchArticles = async () => {
     try {
-      const res = await getArticles();
+      const res = workspaceId ? await getArticlesByWorkspace(workspaceId) : await getArticles();
       setArticles(res);
       setError("");
     } catch (err) {
@@ -18,6 +18,10 @@ function ArticleList({ onSelectArticle }) {
   useEffect(() => {
     fetchArticles();
   }, []);
+
+  useEffect(() => {
+    fetchArticles();
+  }, [workspaceId]);
 
   return (
     <div className="article-list">

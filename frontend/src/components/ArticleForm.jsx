@@ -3,7 +3,7 @@ import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
 import { createArticle, uploadMultiple } from "../services/api";
 
-function ArticleForm({ onArticleCreated }) {
+function ArticleForm({ onArticleCreated, workspaceId }) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [error, setError] = useState("");
@@ -22,7 +22,7 @@ function ArticleForm({ onArticleCreated }) {
     }
 
     try {
-      const res = await createArticle({ title, content });
+      const res = await createArticle({ title, content, workspaceId });
       const id = res.id;
       if (files && files.length > 0) {
         const allowed = ["image/jpeg", "image/png", "image/gif", "application/pdf"];

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getArticle, updateArticle, uploadMultiple } from "../services/api";
+import { getArticle, updateArticle, uploadMultiple, getComments, postComment } from "../services/api";
 
 function ArticleView({ articleId, refreshKey = 0 }) {
   const [article, setArticle] = useState(null);
@@ -11,6 +11,8 @@ function ArticleView({ articleId, refreshKey = 0 }) {
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
   const [filesToUpload, setFilesToUpload] = useState(null);
+  const [comments, setComments] = useState([]);
+  const [commentText, setCommentText] = useState("");
 
   useEffect(() => {
     const fetchArticle = async () => {
@@ -18,6 +20,8 @@ function ArticleView({ articleId, refreshKey = 0 }) {
       try {
         const res = await getArticle(articleId);
         setArticle(res);
+        const cs = await getComments(articleId);
+        setComments(cs);
         setError("");
       } catch (err) {
         setError("Failed to load article.");
@@ -63,9 +67,23 @@ function ArticleView({ articleId, refreshKey = 0 }) {
     }
   };
 
+  const addComment = async () => {
+    if (!commentText.trim()) return;
+    try {
+      const c = await postComment(articleId, { content: commentText, author: 'Anonymous' });
+      setComments((arr) => [...arr, c]);
+      setCommentText("");
+    } catch (e) {
+      setError('Failed to post comment');
+    }
+  };
+
   return (
     <div className="article-view">
-      <h2>{article.title}</h2>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <h2 style={{ margin: 0 }}>{article.title}</h2>
+        {article.Workspace && <div style={{ color: '#6b7280', fontSize: 14 }}>in {article.Workspace.name}</div>}
+      </div>
 
       {article.attachments && article.attachments.length > 0 && (
         <div style={{ marginBottom: 12 }}>
@@ -85,6 +103,23 @@ function ArticleView({ articleId, refreshKey = 0 }) {
           </div>
         </div>
       )}
+      <div style={{ marginTop: 16 }}>
+        <h4>Comments</h4>
+        <ul style={{ listStyle: 'none', padding: 0 }}>
+          {comments.map((c) => (
+            <li key={c.id} style={{ padding: 8, borderBottom: '1px solid #eee' }}>
+              <div style={{ color: '#555', fontSize: 13 }}>{c.author || 'Anonymous'} · {new Date(c.createdAt).toLocaleString()}</div>
+              <div>{c.content}</div>
+            </li>
+          ))}
+        </ul>
+        <div style={{ marginTop: 8 }}>
+          <textarea value={commentText} onChange={(e) => setCommentText(e.target.value)} rows={3} style={{ width: '100%', padding: 8 }} />
+          <div style={{ marginTop: 8 }}>
+            <button className="btn" onClick={addComment}>Add Comment</button>
+          </div>
+        </div>
+      </div>
 
       {!isEditing ? (
         <>

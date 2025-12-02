@@ -19,6 +19,10 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       defaultValue: [],
     },
+    workspaceId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+    },
   }, {
     tableName: 'articles',
     timestamps: true,

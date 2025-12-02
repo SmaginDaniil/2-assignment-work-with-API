@@ -8,7 +8,7 @@ const { v4: uuidv4 } = require("uuid");
 const multer = require("multer");
 const http = require("http");
 const WebSocket = require("ws");
-const { sequelize, Article } = require("./models");
+const { sequelize, Article, Comment, Workspace } = require("./models");
 
 const app = express();
 const PORT = 4000;
@@ -63,16 +63,21 @@ const readArticleFile = (id) => {
 
 app.get("/articles", async (req, res) => {
   try {
-    const articles = await Article.findAll({ attributes: ["id", "title"], order: [["createdAt", "DESC"]] });
+    const where = {};
+    if (req.query.workspaceId) where.workspaceId = req.query.workspaceId;
+    const articles = await Article.findAll({ where, attributes: ["id", "title", "workspaceId"], order: [["createdAt", "DESC"]] });
     res.json(articles);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Failed to fetch articles." });
   }
 });
 
 app.get("/articles/:id", async (req, res) => {
   try {
-    const article = await Article.findByPk(req.params.id);
+    const article = await Article.findByPk(req.params.id, {
+      include: [{ model: Comment, as: 'Comments' }, { model: Workspace, as: 'Workspace' }]
+    });
     if (!article) return res.status(404).json({ error: "Article not found." });
     res.json(article);
   } catch (err) {
@@ -83,8 +88,11 @@ app.get("/articles/:id", async (req, res) => {
 app.post("/articles", async (req, res) => {
   const { title, content } = req.body;
   if (!title || !content) return res.status(400).json({ error: "Title and content are required." });
+  const { workspaceId } = req.body;
   try {
-    const article = await Article.create({ title, content });
+    const attrs = { title, content };
+    if (workspaceId) attrs.workspaceId = workspaceId;
+    const article = await Article.create(attrs);
     res.status(201).json({ message: "Article created successfully.", id: article.id });
   } catch (err) {
     res.status(500).json({ error: "Failed to create article." });
@@ -120,6 +128,71 @@ app.delete("/articles/:id", async (req, res) => {
     res.json({ message: "Article deleted successfully." });
   } catch (err) {
     res.status(500).json({ error: "Failed to delete article." });
+  }
+});
+
+app.get('/workspaces', async (req, res) => {
+  try {
+    const ws = await Workspace.findAll({ order: [['createdAt','ASC']]});
+    res.json(ws);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch workspaces' });
+  }
+});
+
+app.post('/workspaces', async (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  try {
+    const w = await Workspace.create({ name });
+    res.status(201).json(w);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create workspace' });
+  }
+});
+
+app.get('/articles/:id/comments', async (req, res) => {
+  try {
+    const comments = await Comment.findAll({ where: { articleId: req.params.id }, order: [['createdAt','ASC']] });
+    res.json(comments);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch comments' });
+  }
+});
+
+app.post('/articles/:id/comments', async (req, res) => {
+  const { content, author } = req.body;
+  if (!content) return res.status(400).json({ error: 'content is required' });
+  try {
+    const article = await Article.findByPk(req.params.id);
+    if (!article) return res.status(404).json({ error: 'Article not found' });
+    const comment = await Comment.create({ content, author, articleId: req.params.id });
+    res.status(201).json(comment);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create comment' });
+  }
+});
+
+app.put('/comments/:id', async (req, res) => {
+  try {
+    const { content } = req.body;
+    const comment = await Comment.findByPk(req.params.id);
+    if (!comment) return res.status(404).json({ error: 'Comment not found' });
+    comment.content = content || comment.content;
+    await comment.save();
+    res.json(comment);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update comment' });
+  }
+});
+
+app.delete('/comments/:id', async (req, res) => {
+  try {
+    const affected = await Comment.destroy({ where: { id: req.params.id } });
+    if (!affected) return res.status(404).json({ error: 'Comment not found' });
+    res.json({ message: 'Comment deleted' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete comment' });
   }
 });
 

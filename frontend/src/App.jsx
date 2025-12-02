@@ -2,11 +2,13 @@ import React, { useState, useEffect } from "react";
 import ArticleList from "./components/ArticleList";
 import ArticleView from "./components/ArticleView";
 import ArticleForm from "./components/ArticleForm";
+import Workspaces from "./components/Workspaces";
 
 function App() {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [notifications, setNotifications] = useState([]);
+  const [selectedWorkspace, setSelectedWorkspace] = useState(null);
 
   useEffect(() => {
     const ws = new WebSocket("ws://localhost:4000");
@@ -40,9 +42,12 @@ function App() {
   return (
     <div className="app-grid">
       <div className="panel">
-        <ArticleList key={refreshKey} onSelectArticle={(id) => setSelectedArticle(id)} />
+        <Workspaces selectedId={selectedWorkspace} onSelect={(id) => setSelectedWorkspace(id)} />
         <div style={{ marginTop: 12 }}>
-          <ArticleForm onArticleCreated={() => setRefreshKey((k) => k + 1)} />
+          <ArticleList key={`${refreshKey}-${selectedWorkspace||''}`} workspaceId={selectedWorkspace} onSelectArticle={(id) => setSelectedArticle(id)} />
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <ArticleForm onArticleCreated={() => setRefreshKey((k) => k + 1)} workspaceId={selectedWorkspace} />
         </div>
       </div>
       <div className="panel">

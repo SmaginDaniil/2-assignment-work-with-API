@@ -13,7 +13,7 @@ if (config.use_env_variable) {
   sequelize = new Sequelize(config.database, config.username, config.password, config);
 }
 
-fs.readdirSync(__dirname)
+  fs.readdirSync(__dirname)
   .filter(file => (file.indexOf('.') !== 0) && (file !== basename) && (file.slice(-3) === '.js'))
   .forEach(file => {
     const model = require(path.join(__dirname, file))(sequelize, Sequelize.DataTypes);
@@ -25,6 +25,14 @@ Object.keys(db).forEach(modelName => {
     db[modelName].associate(db);
   }
 });
+
+if (db.Article && db.Workspace) {
+  db.Article.belongsTo(db.Workspace, { foreignKey: 'workspaceId' });
+}
+if (db.Comment && db.Article) {
+  db.Comment.belongsTo(db.Article, { foreignKey: 'articleId' });
+  db.Article.hasMany(db.Comment, { foreignKey: 'articleId' });
+}
 
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
