@@ -33,3 +33,11 @@ npm run migrate
 5) Start the server
 npm start
 
+6) Smoke test comment CRUD (after DB is running and migrations applied)
+```powershell
+cd backend
+npm run test-comments
+```
+
+Note: If you don't have a local Postgres, the server will start but endpoints that rely on the DB will return errors; run migrations and ensure Postgres is reachable to fully exercise CRUD flows.
+
