@@ -59,5 +59,15 @@ export async function postComment(articleId, payload) {
   return res.data;
 }
 
+export async function updateComment(commentId, payload) {
+  const res = await base.put(`/comments/${commentId}`, payload);
+  return res.data;
+}
+
+export async function deleteComment(commentId) {
+  const res = await base.delete(`/comments/${commentId}`);
+  return res.data;
+}
+
 
 export default base;

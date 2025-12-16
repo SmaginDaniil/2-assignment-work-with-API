@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getArticles } from "../services/api";
+import { getArticles, getArticlesByWorkspace } from "../services/api";
 
 function ArticleList({ onSelectArticle, workspaceId }) {
   const [articles, setArticles] = useState([]);

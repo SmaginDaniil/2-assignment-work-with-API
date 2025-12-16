@@ -53,7 +53,6 @@ const upload = multer({
   },
 });
 
-// file-based persistence functions kept for backward compatibility
 const getArticlePath = (id) => path.join(DATA_DIR, `${id}.json`);
 const readArticleFile = (id) => {
   const filePath = getArticlePath(id);
