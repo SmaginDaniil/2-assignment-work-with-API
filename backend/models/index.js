@@ -34,6 +34,10 @@ if (db.Comment && db.Article) {
   db.Article.hasMany(db.Comment, { foreignKey: 'articleId' });
 }
 
+if (db.Article && db.ArticleVersion) {
+  db.Article.hasMany(db.ArticleVersion, { foreignKey: 'articleId', as: 'Versions' });
+}
+
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
 

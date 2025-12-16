@@ -74,12 +74,34 @@ app.get("/articles", async (req, res) => {
 
 app.get("/articles/:id", async (req, res) => {
   try {
-    const article = await Article.findByPk(req.params.id, {
-      include: [{ model: Comment, as: 'Comments' }, { model: Workspace, as: 'Workspace' }]
-    });
+    const { versionId } = req.query;
+    const article = await Article.findByPk(req.params.id, { include: [{ model: Comment, as: 'Comments' }, { model: Workspace, as: 'Workspace' }] });
     if (!article) return res.status(404).json({ error: "Article not found." });
+
+    // If versionId provided return that version (read-only)
+    if (versionId) {
+      const version = await sequelize.models.ArticleVersion.findByPk(versionId);
+      if (!version || version.articleId !== article.id) return res.status(404).json({ error: 'Version not found for this article' });
+      return res.json({
+        id: article.id,
+        title: version.title,
+        workspaceId: article.workspaceId,
+        version: { id: version.id, number: version.version, content: version.content, attachments: version.attachments, createdAt: version.createdAt },
+        isCurrent: false,
+        Comments: article.Comments || []
+      });
+    }
+
+    // Otherwise return latest version (if available)
+    const latest = await sequelize.models.ArticleVersion.findOne({ where: { articleId: article.id }, order: [['version', 'DESC']] });
+    if (latest) {
+      return res.json({ id: article.id, title: latest.title, workspaceId: article.workspaceId, version: { id: latest.id, number: latest.version, content: latest.content, attachments: latest.attachments, createdAt: latest.createdAt }, isCurrent: true, Comments: article.Comments || [] });
+    }
+
+    // Fallback: legacy data (if migration not run yet)
     res.json(article);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Failed to fetch article." });
   }
 });
@@ -89,11 +111,16 @@ app.post("/articles", async (req, res) => {
   if (!title || !content) return res.status(400).json({ error: "Title and content are required." });
   const { workspaceId } = req.body;
   try {
-    const attrs = { title, content };
+    const attrs = { title };
     if (workspaceId) attrs.workspaceId = workspaceId;
     const article = await Article.create(attrs);
+
+    // create initial version
+    await sequelize.models.ArticleVersion.create({ articleId: article.id, version: 1, title, content, attachments: [] });
+
     res.status(201).json({ message: "Article created successfully.", id: article.id });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Failed to create article." });
   }
 });
@@ -109,12 +136,26 @@ app.put("/articles/:id", async (req, res) => {
   try {
     const article = await Article.findByPk(id);
     if (!article) return res.status(404).json({ error: "Article not found." });
+
+    // Do not allow editing a historical version explicitly
+    if (req.query.versionId) return res.status(400).json({ error: 'Cannot edit a historical version' });
+
+    // find latest version number
+    const latest = await sequelize.models.ArticleVersion.findOne({ where: { articleId: id }, order: [['version', 'DESC']] });
+    const nextVersion = latest ? latest.version + 1 : 1;
+
+    // create new version (copy attachments from latest if any)
+    const attachments = (latest && latest.attachments) ? latest.attachments : [];
+    const ver = await sequelize.models.ArticleVersion.create({ articleId: id, version: nextVersion, title, content, attachments });
+
+    // keep Article.title up-to-date
     article.title = title;
-    article.content = content;
     await article.save();
-    broadcast({ type: "article_updated", id, message: "Article updated" });
-    res.json({ message: "Article updated successfully." });
+
+    broadcast({ type: "article_updated", id, version: ver.version, message: "Article updated (new version)" });
+    res.json({ message: "Article updated and new version created.", versionId: ver.id, versionNumber: ver.version });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Failed to update article." });
   }
 });
@@ -127,6 +168,50 @@ app.delete("/articles/:id", async (req, res) => {
     res.json({ message: "Article deleted successfully." });
   } catch (err) {
     res.status(500).json({ error: "Failed to delete article." });
+  }
+});
+
+app.post("/articles/:id/attachments", upload.single("file"), async (req, res) => {
+  const { id } = req.params;
+  const file = req.file;
+  if (!file) {
+    return res.status(400).json({ error: "No file uploaded or invalid file type." });
+  }
+
+  const article = await Article.findByPk(id);
+  if (!article) {
+    fs.unlinkSync(file.path);
+    return res.status(404).json({ error: "Article not found." });
+  }
+
+  const attachment = {
+    filename: file.filename,
+    originalname: file.originalname,
+    mimetype: file.mimetype,
+    url: `/uploads/${file.filename}`,
+    size: file.size,
+  };
+
+  // create a new version that appends this attachment
+  const latest = await sequelize.models.ArticleVersion.findOne({ where: { articleId: id }, order: [['version', 'DESC']] });
+  const nextVersion = latest ? latest.version + 1 : 1;
+  const attachments = (latest && latest.attachments) ? (latest.attachments || []).concat([attachment]) : [attachment];
+
+  const ver = await sequelize.models.ArticleVersion.create({ articleId: id, version: nextVersion, title: latest ? latest.title : article.title || '', content: latest ? latest.content : '', attachments });
+
+  broadcast({ type: "attachment_added", id, version: ver.version, message: `Attachment ${attachment.originalname} added` });
+
+  res.status(201).json({ message: "Attachment uploaded and new version created.", attachment, versionId: ver.id });
+});
+
+// List versions for an article
+app.get('/articles/:id/versions', async (req, res) => {
+  try {
+    const versions = await sequelize.models.ArticleVersion.findAll({ where: { articleId: req.params.id }, order: [['version','DESC']] });
+    res.json(versions.map(v => ({ id: v.id, version: v.version, createdAt: v.createdAt })));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch versions' });
   }
 });
 
@@ -201,10 +286,26 @@ app.get("/", (req, res) => {
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
-
 function broadcast(data) {
+  const payload = JSON.stringify(data);
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(payload);
+    }
+  });
+}
+
+wss.on("connection", (ws) => {
+  console.log("WebSocket client connected");
+  ws.on("message", (msg) => {
+    console.log("received ws message", msg.toString());
+  });
+});
+
 // Register comment routes (moved to a separate module for clarity)
 require('./routes/comments')(app, { Article, Comment }, broadcast);
+
+(async function startServer() {
   try {
     await sequelize.authenticate();
     console.log('Database connected');

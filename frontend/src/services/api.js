@@ -16,6 +16,16 @@ export async function getArticle(id) {
   return res.data;
 }
 
+export async function getArticleVersion(articleId, versionId) {
+  const res = await base.get(`/articles/${articleId}`, { params: { versionId } });
+  return res.data;
+}
+
+export async function getArticleVersions(articleId) {
+  const res = await base.get(`/articles/${articleId}/versions`);
+  return res.data;
+}
+
 export async function createArticle(payload) {
   const res = await base.post(`/articles`, payload);
   return res.data;

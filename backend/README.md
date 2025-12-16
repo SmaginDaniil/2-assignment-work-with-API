@@ -41,3 +41,8 @@ npm run test-comments
 
 Note: If you don't have a local Postgres, the server will start but endpoints that rely on the DB will return errors; run migrations and ensure Postgres is reachable to fully exercise CRUD flows.
 
+Versioning:
+- Article versions are stored in the `ArticleVersions` table. When an article is updated or an attachment is added, a new version is created.
+- View the latest article with `GET /articles/:id` (default) or an older version with `GET /articles/:id?versionId=<versionUuid>`.
+- List available versions with `GET /articles/:id/versions`.
+

@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { getArticle, updateArticle, uploadMultiple, getComments, postComment } from "../services/api";
+import { getArticle, getArticleVersion, getArticleVersions, updateArticle, uploadMultiple, getComments, postComment } from "../services/api";
 
 function ArticleView({ articleId, refreshKey = 0 }) {
   const [article, setArticle] = useState(null);
+  const [versions, setVersions] = useState([]);
+  const [selectedVersionId, setSelectedVersionId] = useState(null);
   const [error, setError] = useState("");
   const [file, setFile] = useState(null);
   const [uploadError, setUploadError] = useState("");
@@ -20,6 +22,9 @@ function ArticleView({ articleId, refreshKey = 0 }) {
       try {
         const res = await getArticle(articleId);
         setArticle(res);
+        const vs = await getArticleVersions(articleId);
+        setVersions(vs || []);
+        setSelectedVersionId(null);
         const cs = await getComments(articleId);
         setComments(cs);
         setError("");
@@ -43,9 +48,10 @@ function ArticleView({ articleId, refreshKey = 0 }) {
   }
 
   const startEdit = () => {
+    if (article.isCurrent === false) return;
     setIsEditing(true);
     setEditTitle(article.title);
-    setEditContent(article.content);
+    setEditContent(article.version ? article.version.content : article.content);
   };
 
   const cancelEdit = () => {
@@ -62,6 +68,11 @@ function ArticleView({ articleId, refreshKey = 0 }) {
         setFilesToUpload(null);
       }
       setIsEditing(false);
+      // refresh article and versions
+      const res = await getArticle(articleId);
+      setArticle(res);
+      const vs = await getArticleVersions(articleId);
+      setVersions(vs || []);
     } catch (err) {
       setError(err.response?.data?.error || err.message || "Save failed.");
     }
@@ -80,16 +91,39 @@ function ArticleView({ articleId, refreshKey = 0 }) {
 
   return (
     <div className="article-view">
+      {article && article.isCurrent === false && (
+        <div style={{ padding: 8, background: '#fff3cd', border: '1px solid #ffeeba', borderRadius: 4, marginBottom: 12 }}>
+          Viewing <strong>older version</strong> (v{article.version.number}) — this is read-only.
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
         <h2 style={{ margin: 0 }}>{article.title}</h2>
         {article.Workspace && <div style={{ color: '#6b7280', fontSize: 14 }}>in {article.Workspace.name}</div>}
+        <div style={{ marginLeft: 'auto' }}>
+          <select value={selectedVersionId || ''} onChange={async (e) => {
+            const vId = e.target.value || null;
+            setSelectedVersionId(vId);
+            try {
+              const res = vId ? await getArticleVersion(articleId, vId) : await getArticle(articleId);
+              setArticle(res);
+            } catch (err) {
+              setError('Failed to load version');
+            }
+          }}>
+            <option value="">Latest</option>
+            {versions.map(v => (
+              <option key={v.id} value={v.id}>v{v.version} · {new Date(v.createdAt).toLocaleString()}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {article.attachments && article.attachments.length > 0 && (
+      {((article.version && article.version.attachments) || article.attachments) && ((article.version && article.version.attachments) || article.attachments).length > 0 && (
         <div style={{ marginBottom: 12 }}>
           <strong>Attachments:</strong>
           <div className="attachments">
-            {article.attachments.map((att) => (
+            {((article.version && article.version.attachments) || article.attachments).map((att) => (
               <a
                 key={att.filename}
                 href={`http://localhost:4000${att.url}`}
@@ -123,10 +157,10 @@ function ArticleView({ articleId, refreshKey = 0 }) {
 
       {!isEditing ? (
         <>
-          <div className="article-content" dangerouslySetInnerHTML={{ __html: article.content }} style={{ background: "#f9f9f9", padding: "15px", borderRadius: "8px", minHeight: "200px" }} />
+          <div className="article-content" dangerouslySetInnerHTML={{ __html: (article.version ? article.version.content : article.content) }} style={{ background: "#f9f9f9", padding: "15px", borderRadius: "8px", minHeight: "200px" }} />
 
           <div style={{ marginTop: 12 }}>
-            <button onClick={startEdit} style={{ padding: "8px 12px", marginRight: 8 }}>Edit</button>
+            <button onClick={startEdit} style={{ padding: "8px 12px", marginRight: 8 }} disabled={article.isCurrent === false}>Edit</button>
           </div>
         </>
       ) : (

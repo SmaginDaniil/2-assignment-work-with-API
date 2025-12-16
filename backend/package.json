@@ -7,7 +7,8 @@
     "start:dev": "nodemon server.js",
     "migrate": "npx sequelize-cli db:migrate --config ./config/config.js",
     "import-data": "node scripts/import-files-to-db.js",
-    "test-comments": "node scripts/test-comments.js"
+    "test-comments": "node scripts/test-comments.js",
+    "test-versions": "node scripts/test-versions.js"
   },
   "dependencies": {
     "express": "^4.18.2",
