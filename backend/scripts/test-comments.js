@@ -1,37 +1,40 @@
-const axios = require('axios');
+const BASE = 'http://localhost:4000';
 
-const base = axios.create({ baseURL: 'http://localhost:4000' });
+async function req(path, opts = {}) {
+  const res = await fetch(`${BASE}${path}`, opts);
+  const text = await res.text();
+  let data = text;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {}
+  if (!res.ok) throw new Error(JSON.stringify({ status: res.status, data }));
+  return data;
+}
 
 async function run() {
   try {
-    // Create an article to attach comments to
-    const a = await base.post('/articles', { title: 'Test Article for Comments', content: 'body' });
-    const articleId = a.data.id;
+    const a = await req('/articles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Test Article for Comments', content: 'body' }) });
+    const articleId = a.id;
     console.log('Article created', articleId);
 
-    // Create comment
-    const c1 = await base.post(`/articles/${articleId}/comments`, { content: 'First comment', author: 'Tester' });
-    console.log('Comment created', c1.data);
+    const c1 = await req(`/articles/${articleId}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: 'First comment', author: 'Tester' }) });
+    console.log('Comment created', c1);
 
-    // Update comment
-    const updated = await base.put(`/comments/${c1.data.id}`, { content: 'Updated content' });
-    console.log('Comment updated', updated.data);
+    const updated = await req(`/comments/${c1.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: 'Updated content' }) });
+    console.log('Comment updated', updated);
 
-    // Get comments
-    const res = await base.get(`/articles/${articleId}/comments`);
-    console.log('Comments for article', res.data);
+    const res = await req(`/articles/${articleId}/comments`);
+    console.log('Comments for article', res);
 
-    // Delete comment
-    const del = await base.delete(`/comments/${c1.data.id}`);
-    console.log('Comment deleted', del.data);
+    const del = await req(`/comments/${c1.id}`, { method: 'DELETE' });
+    console.log('Comment deleted', del);
 
-    // Cleanup: delete article
-    await base.delete(`/articles/${articleId}`);
+    await req(`/articles/${articleId}`, { method: 'DELETE' });
     console.log('Article deleted');
 
     console.log('Comment CRUD smoke test completed successfully');
   } catch (err) {
-    console.error('Test failed', err.response?.data || err.message);
+    console.error('Test failed', err.message || err);
     process.exit(1);
   }
 }

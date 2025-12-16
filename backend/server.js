@@ -203,51 +203,8 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 function broadcast(data) {
-  const payload = JSON.stringify(data);
-  wss.clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(payload);
-    }
-  });
-}
-
-wss.on("connection", (ws) => {
-  console.log("WebSocket client connected");
-  ws.on("message", (msg) => {
-    console.log("received ws message", msg.toString());
-  });
-});
-
-app.post("/articles/:id/attachments", upload.single("file"), async (req, res) => {
-  const { id } = req.params;
-  const file = req.file;
-  if (!file) {
-    return res.status(400).json({ error: "No file uploaded or invalid file type." });
-  }
-
-  const article = await Article.findByPk(id);
-  if (!article) {
-    fs.unlinkSync(file.path);
-    return res.status(404).json({ error: "Article not found." });
-  }
-
-  const attachment = {
-    filename: file.filename,
-    originalname: file.originalname,
-    mimetype: file.mimetype,
-    url: `/uploads/${file.filename}`,
-    size: file.size,
-  };
-
-  article.attachments = (article.attachments || []).concat([attachment]);
-  await article.save();
-
-  broadcast({ type: "attachment_added", id, message: `Attachment ${attachment.originalname} added` });
-
-  res.status(201).json({ message: "Attachment uploaded.", attachment });
-});
-
-(async function startServer() {
+// Register comment routes (moved to a separate module for clarity)
+require('./routes/comments')(app, { Article, Comment }, broadcast);
   try {
     await sequelize.authenticate();
     console.log('Database connected');
