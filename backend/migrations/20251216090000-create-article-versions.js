@@ -12,7 +12,7 @@ module.exports = {
       articleId: {
         type: Sequelize.UUID,
         allowNull: false,
-        references: { model: "Articles", key: "id" },
+        references: { model: "articles", key: "id" },
         onDelete: "CASCADE",
       },
       version: {
@@ -26,30 +26,30 @@ module.exports = {
       updatedAt: { type: Sequelize.DATE, allowNull: false },
     });
 
-    
-    const articles = await queryInterface.sequelize.query(
-      'SELECT id, title, content, attachments, "createdAt", "updatedAt" FROM "Articles"',
-      { type: queryInterface.sequelize.QueryTypes.SELECT }
-    );
+    // Migrate existing articles to versions table (if articles table has data)
+    try {
+      const articles = await queryInterface.sequelize.query(
+        'SELECT id, title, content, attachments, "createdAt", "updatedAt" FROM articles',
+        { type: queryInterface.sequelize.QueryTypes.SELECT }
+      );
 
-    for (const a of articles) {
-      await queryInterface.bulkInsert("ArticleVersions", [
-        {
-          id: Sequelize.Utils ? Sequelize.Utils.toDefaultValue(Sequelize.UUIDV4) : undefined,
-          articleId: a.id,
-          version: 1,
-          title: a.title || "",
-          content: a.content || "",
-          attachments: a.attachments || null,
-          createdAt: a.createdAt || new Date(),
-          updatedAt: a.updatedAt || new Date(),
-        },
-      ]);
+      for (const a of articles) {
+        await queryInterface.bulkInsert("ArticleVersions", [
+          {
+            articleId: a.id,
+            version: 1,
+            title: a.title || "",
+            content: a.content || "",
+            attachments: a.attachments || null,
+            createdAt: a.createdAt || new Date(),
+            updatedAt: a.updatedAt || new Date(),
+          },
+        ]);
+      }
+    } catch (err) {
+      // If articles table is empty or doesn't exist yet, skip migration
+      console.log("articles table empty or not yet created, skipping version migration");
     }
-
-    
-    await queryInterface.removeColumn("Articles", "content");
-    await queryInterface.removeColumn("Articles", "attachments");
   },
 
   async down(queryInterface, Sequelize) {
