@@ -26,7 +26,7 @@ module.exports = {
       updatedAt: { type: Sequelize.DATE, allowNull: false },
     });
 
-    // Migrate existing article content into version 1 entries
+    
     const articles = await queryInterface.sequelize.query(
       'SELECT id, title, content, attachments, "createdAt", "updatedAt" FROM "Articles"',
       { type: queryInterface.sequelize.QueryTypes.SELECT }
@@ -47,17 +47,17 @@ module.exports = {
       ]);
     }
 
-    // Remove content & attachments from Articles table (now stored in versions)
+    
     await queryInterface.removeColumn("Articles", "content");
     await queryInterface.removeColumn("Articles", "attachments");
   },
 
   async down(queryInterface, Sequelize) {
-    // Add content & attachments back to Articles
+    
     await queryInterface.addColumn("Articles", "content", { type: Sequelize.TEXT });
     await queryInterface.addColumn("Articles", "attachments", { type: Sequelize.JSONB });
 
-    // Restore latest versions into Articles
+    
     const latest = await queryInterface.sequelize.query(
       `SELECT a."articleId" as id, a.title, a.content, a.attachments FROM "ArticleVersions" a
        INNER JOIN (

@@ -78,7 +78,6 @@ app.get("/articles/:id", async (req, res) => {
     const article = await Article.findByPk(req.params.id, { include: [{ model: Comment, as: 'Comments' }, { model: Workspace, as: 'Workspace' }] });
     if (!article) return res.status(404).json({ error: "Article not found." });
 
-    // If versionId provided return that version (read-only)
     if (versionId) {
       const version = await sequelize.models.ArticleVersion.findByPk(versionId);
       if (!version || version.articleId !== article.id) return res.status(404).json({ error: 'Version not found for this article' });
@@ -91,14 +90,11 @@ app.get("/articles/:id", async (req, res) => {
         Comments: article.Comments || []
       });
     }
-
-    // Otherwise return latest version (if available)
     const latest = await sequelize.models.ArticleVersion.findOne({ where: { articleId: article.id }, order: [['version', 'DESC']] });
     if (latest) {
       return res.json({ id: article.id, title: latest.title, workspaceId: article.workspaceId, version: { id: latest.id, number: latest.version, content: latest.content, attachments: latest.attachments, createdAt: latest.createdAt }, isCurrent: true, Comments: article.Comments || [] });
     }
 
-    // Fallback: legacy data (if migration not run yet)
     res.json(article);
   } catch (err) {
     console.error(err);
@@ -115,7 +111,6 @@ app.post("/articles", async (req, res) => {
     if (workspaceId) attrs.workspaceId = workspaceId;
     const article = await Article.create(attrs);
 
-    // create initial version
     await sequelize.models.ArticleVersion.create({ articleId: article.id, version: 1, title, content, attachments: [] });
 
     res.status(201).json({ message: "Article created successfully.", id: article.id });
@@ -137,18 +132,14 @@ app.put("/articles/:id", async (req, res) => {
     const article = await Article.findByPk(id);
     if (!article) return res.status(404).json({ error: "Article not found." });
 
-    // Do not allow editing a historical version explicitly
     if (req.query.versionId) return res.status(400).json({ error: 'Cannot edit a historical version' });
 
-    // find latest version number
     const latest = await sequelize.models.ArticleVersion.findOne({ where: { articleId: id }, order: [['version', 'DESC']] });
     const nextVersion = latest ? latest.version + 1 : 1;
 
-    // create new version (copy attachments from latest if any)
     const attachments = (latest && latest.attachments) ? latest.attachments : [];
     const ver = await sequelize.models.ArticleVersion.create({ articleId: id, version: nextVersion, title, content, attachments });
 
-    // keep Article.title up-to-date
     article.title = title;
     await article.save();
 
@@ -192,7 +183,6 @@ app.post("/articles/:id/attachments", upload.single("file"), async (req, res) =>
     size: file.size,
   };
 
-  // create a new version that appends this attachment
   const latest = await sequelize.models.ArticleVersion.findOne({ where: { articleId: id }, order: [['version', 'DESC']] });
   const nextVersion = latest ? latest.version + 1 : 1;
   const attachments = (latest && latest.attachments) ? (latest.attachments || []).concat([attachment]) : [attachment];
@@ -204,7 +194,6 @@ app.post("/articles/:id/attachments", upload.single("file"), async (req, res) =>
   res.status(201).json({ message: "Attachment uploaded and new version created.", attachment, versionId: ver.id });
 });
 
-// List versions for an article
 app.get('/articles/:id/versions', async (req, res) => {
   try {
     const versions = await sequelize.models.ArticleVersion.findAll({ where: { articleId: req.params.id }, order: [['version','DESC']] });
@@ -302,7 +291,6 @@ wss.on("connection", (ws) => {
   });
 });
 
-// Register comment routes (moved to a separate module for clarity)
 require('./routes/comments')(app, { Article, Comment }, broadcast);
 
 (async function startServer() {

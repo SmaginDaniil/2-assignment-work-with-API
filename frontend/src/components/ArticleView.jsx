@@ -68,7 +68,6 @@ function ArticleView({ articleId, refreshKey = 0 }) {
         setFilesToUpload(null);
       }
       setIsEditing(false);
-      // refresh article and versions
       const res = await getArticle(articleId);
       setArticle(res);
       const vs = await getArticleVersions(articleId);

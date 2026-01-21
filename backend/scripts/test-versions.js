@@ -25,12 +25,11 @@ async function run() {
     console.log('Versions list', versions);
     if (versions.length < 3) throw new Error('expected 3 versions');
 
-    const firstVersionId = versions[versions.length - 1].id; // versions returned desc, so last is v1
+    const firstVersionId = versions[versions.length - 1].id;
     const v1 = await req(`/articles/${articleId}?versionId=${firstVersionId}`);
     console.log('Fetched v1', v1.version.number, v1.version.content);
     if (v1.version.content !== 'v1') throw new Error('v1 content mismatch');
 
-    // Try to edit v1 explicitly (should be rejected)
     try {
       await req(`/articles/${articleId}?versionId=${firstVersionId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'x', content: 'x' }) });
       throw new Error('Editing historical version should have failed');

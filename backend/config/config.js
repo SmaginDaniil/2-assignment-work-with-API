@@ -1,7 +1,14 @@
 require('dotenv').config();
+const path = require('path');
+
+const useSqlite = process.env.DB_DIALECT === 'sqlite';
 
 module.exports = {
-  development: {
+  development: useSqlite ? {
+    dialect: 'sqlite',
+    storage: path.join(__dirname, '..', 'data', 'dev.sqlite'),
+    logging: false,
+  } : {
     username: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASS || 'postgres',
     database: process.env.DB_NAME || 'articles_db',
@@ -10,7 +17,11 @@ module.exports = {
     dialect: 'postgres',
     logging: false,
   },
-  test: {
+  test: useSqlite ? {
+    dialect: 'sqlite',
+    storage: path.join(__dirname, '..', 'data', 'test.sqlite'),
+    logging: false,
+  } : {
     username: process.env.DB_USER || 'postgres',
     password: process.env.DB_PASS || 'postgres',
     database: process.env.DB_NAME || 'articles_db_test',

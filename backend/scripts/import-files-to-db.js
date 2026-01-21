@@ -22,7 +22,6 @@ async function importFiles() {
         continue;
       }
       const article = await Article.create({ id: content.id, title: content.title });
-      // create initial version
       await sequelize.models.ArticleVersion.create({ articleId: article.id, version: 1, title: content.title, content: content.content || '', attachments: content.attachments || [] });
       console.log(`Imported ${content.id}`);
     } catch (e) {
