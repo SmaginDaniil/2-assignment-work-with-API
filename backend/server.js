@@ -8,7 +8,9 @@ const { v4: uuidv4 } = require("uuid");
 const multer = require("multer");
 const http = require("http");
 const WebSocket = require("ws");
-const { sequelize, Article, Comment, Workspace } = require("./models");
+const { sequelize, Article, Comment, Workspace, ArticleVersion } = require("./models");
+const verifyToken = require("./middleware/auth");
+const authRoutes = require("./routes/auth");
 
 const app = express();
 const PORT = 4000;
@@ -17,6 +19,8 @@ const UPLOADS_DIR = path.join(__dirname, "uploads");
 
 app.use(cors());
 app.use(bodyParser.json());
+
+app.use("/auth", authRoutes);
 
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR);
@@ -60,7 +64,7 @@ const readArticleFile = (id) => {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 };
 
-app.get("/articles", async (req, res) => {
+app.get("/articles", verifyToken, async (req, res) => {
   try {
     const where = {};
     if (req.query.workspaceId) where.workspaceId = req.query.workspaceId;
@@ -72,14 +76,14 @@ app.get("/articles", async (req, res) => {
   }
 });
 
-app.get("/articles/:id", async (req, res) => {
+app.get("/articles/:id", verifyToken, async (req, res) => {
   try {
     const { versionId } = req.query;
     const article = await Article.findByPk(req.params.id, { include: [{ model: Comment, as: 'Comments' }, { model: Workspace, as: 'Workspace' }] });
     if (!article) return res.status(404).json({ error: "Article not found." });
 
     if (versionId) {
-      const version = await sequelize.models.ArticleVersion.findByPk(versionId);
+      const version = await ArticleVersion.findByPk(versionId);
       if (!version || version.articleId !== article.id) return res.status(404).json({ error: 'Version not found for this article' });
       return res.json({
         id: article.id,
@@ -90,7 +94,7 @@ app.get("/articles/:id", async (req, res) => {
         Comments: article.Comments || []
       });
     }
-    const latest = await sequelize.models.ArticleVersion.findOne({ where: { articleId: article.id }, order: [['version', 'DESC']] });
+    const latest = await ArticleVersion.findOne({ where: { articleId: article.id }, order: [['version', 'DESC']] });
     if (latest) {
       return res.json({ id: article.id, title: latest.title, workspaceId: article.workspaceId, version: { id: latest.id, number: latest.version, content: latest.content, attachments: latest.attachments, createdAt: latest.createdAt }, isCurrent: true, Comments: article.Comments || [] });
     }
@@ -102,25 +106,25 @@ app.get("/articles/:id", async (req, res) => {
   }
 });
 
-app.post("/articles", async (req, res) => {
+app.post("/articles", verifyToken, async (req, res) => {
   const { title, content } = req.body;
   if (!title || !content) return res.status(400).json({ error: "Title and content are required." });
   const { workspaceId } = req.body;
   try {
-    const attrs = { title };
+    const attrs = { title, content, attachments: [] };
     if (workspaceId) attrs.workspaceId = workspaceId;
     const article = await Article.create(attrs);
 
-    await sequelize.models.ArticleVersion.create({ articleId: article.id, version: 1, title, content, attachments: [] });
+    await ArticleVersion.create({ articleId: article.id, version: 1, title, content, attachments: [] });
 
     res.status(201).json({ message: "Article created successfully.", id: article.id });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to create article." });
+    console.error("POST /articles error:", err.message, err.stack);
+    res.status(500).json({ error: "Failed to create article.", details: err.message });
   }
 });
 
-app.put("/articles/:id", async (req, res) => {
+app.put("/articles/:id", verifyToken, async (req, res) => {
   const { id } = req.params;
   const { title, content } = req.body;
 
@@ -134,11 +138,11 @@ app.put("/articles/:id", async (req, res) => {
 
     if (req.query.versionId) return res.status(400).json({ error: 'Cannot edit a historical version' });
 
-    const latest = await sequelize.models.ArticleVersion.findOne({ where: { articleId: id }, order: [['version', 'DESC']] });
+    const latest = await ArticleVersion.findOne({ where: { articleId: id }, order: [['version', 'DESC']] });
     const nextVersion = latest ? latest.version + 1 : 1;
 
     const attachments = (latest && latest.attachments) ? latest.attachments : [];
-    const ver = await sequelize.models.ArticleVersion.create({ articleId: id, version: nextVersion, title, content, attachments });
+    const ver = await ArticleVersion.create({ articleId: id, version: nextVersion, title, content, attachments });
 
     article.title = title;
     await article.save();
@@ -146,12 +150,12 @@ app.put("/articles/:id", async (req, res) => {
     broadcast({ type: "article_updated", id, version: ver.version, message: "Article updated (new version)" });
     res.json({ message: "Article updated and new version created.", versionId: ver.id, versionNumber: ver.version });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to update article." });
+    console.error("PUT /articles/:id error:", err.message, err.stack);
+    res.status(500).json({ error: "Failed to update article.", details: err.message });
   }
 });
 
-app.delete("/articles/:id", async (req, res) => {
+app.delete("/articles/:id", verifyToken, async (req, res) => {
   const { id } = req.params;
   try {
     const affected = await Article.destroy({ where: { id } });
@@ -162,7 +166,7 @@ app.delete("/articles/:id", async (req, res) => {
   }
 });
 
-app.post("/articles/:id/attachments", upload.single("file"), async (req, res) => {
+app.post("/articles/:id/attachments", verifyToken, upload.single("file"), async (req, res) => {
   const { id } = req.params;
   const file = req.file;
   if (!file) {
@@ -183,20 +187,20 @@ app.post("/articles/:id/attachments", upload.single("file"), async (req, res) =>
     size: file.size,
   };
 
-  const latest = await sequelize.models.ArticleVersion.findOne({ where: { articleId: id }, order: [['version', 'DESC']] });
+  const latest = await ArticleVersion.findOne({ where: { articleId: id }, order: [['version', 'DESC']] });
   const nextVersion = latest ? latest.version + 1 : 1;
   const attachments = (latest && latest.attachments) ? (latest.attachments || []).concat([attachment]) : [attachment];
 
-  const ver = await sequelize.models.ArticleVersion.create({ articleId: id, version: nextVersion, title: latest ? latest.title : article.title || '', content: latest ? latest.content : '', attachments });
+  const ver = await ArticleVersion.create({ articleId: id, version: nextVersion, title: latest ? latest.title : article.title || '', content: latest ? latest.content : '', attachments });
 
   broadcast({ type: "attachment_added", id, version: ver.version, message: `Attachment ${attachment.originalname} added` });
 
   res.status(201).json({ message: "Attachment uploaded and new version created.", attachment, versionId: ver.id });
 });
 
-app.get('/articles/:id/versions', async (req, res) => {
+app.get('/articles/:id/versions', verifyToken, async (req, res) => {
   try {
-    const versions = await sequelize.models.ArticleVersion.findAll({ where: { articleId: req.params.id }, order: [['version','DESC']] });
+    const versions = await ArticleVersion.findAll({ where: { articleId: req.params.id }, order: [['version','DESC']] });
     res.json(versions.map(v => ({ id: v.id, version: v.version, createdAt: v.createdAt })));
   } catch (err) {
     console.error(err);
@@ -204,7 +208,7 @@ app.get('/articles/:id/versions', async (req, res) => {
   }
 });
 
-app.get('/workspaces', async (req, res) => {
+app.get('/workspaces', verifyToken, async (req, res) => {
   try {
     const ws = await Workspace.findAll({ order: [['createdAt','ASC']]});
     res.json(ws);
@@ -213,7 +217,7 @@ app.get('/workspaces', async (req, res) => {
   }
 });
 
-app.post('/workspaces', async (req, res) => {
+app.post('/workspaces', verifyToken, async (req, res) => {
   const { name } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
   try {
@@ -224,7 +228,7 @@ app.post('/workspaces', async (req, res) => {
   }
 });
 
-app.get('/articles/:id/comments', async (req, res) => {
+app.get('/articles/:id/comments', verifyToken, async (req, res) => {
   try {
     const comments = await Comment.findAll({ where: { articleId: req.params.id }, order: [['createdAt','ASC']] });
     res.json(comments);
@@ -233,7 +237,7 @@ app.get('/articles/:id/comments', async (req, res) => {
   }
 });
 
-app.post('/articles/:id/comments', async (req, res) => {
+app.post('/articles/:id/comments', verifyToken, async (req, res) => {
   const { content, author } = req.body;
   if (!content) return res.status(400).json({ error: 'content is required' });
   try {
@@ -246,7 +250,7 @@ app.post('/articles/:id/comments', async (req, res) => {
   }
 });
 
-app.put('/comments/:id', async (req, res) => {
+app.put('/comments/:id', verifyToken, async (req, res) => {
   try {
     const { content } = req.body;
     const comment = await Comment.findByPk(req.params.id);
@@ -259,7 +263,7 @@ app.put('/comments/:id', async (req, res) => {
   }
 });
 
-app.delete('/comments/:id', async (req, res) => {
+app.delete('/comments/:id', verifyToken, async (req, res) => {
   try {
     const affected = await Comment.destroy({ where: { id: req.params.id } });
     if (!affected) return res.status(404).json({ error: 'Comment not found' });

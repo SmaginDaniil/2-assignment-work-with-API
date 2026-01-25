@@ -2,6 +2,25 @@ import axios from "axios";
 
 const base = axios.create({ baseURL: "http://localhost:4000" });
 
+base.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+base.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem("token");
+      window.location.href = "/login";
+    }
+    return Promise.reject(error);
+  }
+);
+
 export async function getArticles() {
   const res = await base.get("/articles");
   return res.data;

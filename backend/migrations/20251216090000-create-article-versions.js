@@ -21,7 +21,7 @@ module.exports = {
       },
       title: { type: Sequelize.STRING, allowNull: false },
       content: { type: Sequelize.TEXT, allowNull: false },
-      attachments: { type: Sequelize.JSONB, allowNull: true },
+      attachments: { type: Sequelize.JSON, allowNull: true },
       createdAt: { type: Sequelize.DATE, allowNull: false },
       updatedAt: { type: Sequelize.DATE, allowNull: false },
     });

@@ -17,18 +17,18 @@ module.exports = {
         allowNull: false,
       },
       attachments: {
-        type: Sequelize.JSONB,
+        type: Sequelize.JSON,
         defaultValue: []
       },
       createdAt: {
         type: Sequelize.DATE,
         allowNull: false,
-        defaultValue: Sequelize.literal('NOW()')
+        defaultValue: Sequelize.NOW
       },
       updatedAt: {
         type: Sequelize.DATE,
         allowNull: false,
-        defaultValue: Sequelize.literal('NOW()')
+        defaultValue: Sequelize.NOW
       }
     });
   },

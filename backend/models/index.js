@@ -41,4 +41,12 @@ if (db.Article && db.ArticleVersion) {
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
 
-module.exports = db;
+module.exports = {
+  ...db,
+  Article: db.Article,
+  Comment: db.Comment,
+  Workspace: db.Workspace,
+  ArticleVersion: db.ArticleVersion,
+  sequelize: db.sequelize,
+  Sequelize: db.Sequelize,
+};
