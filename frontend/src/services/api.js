@@ -98,5 +98,14 @@ export async function deleteComment(commentId) {
   return res.data;
 }
 
+export async function getUsers() {
+  const res = await base.get('/api/users');
+  return res.data;
+}
+
+export async function updateUserRole(userId, role) {
+  const res = await base.put(`/api/users/${userId}/role`, { role });
+  return res.data;
+}
 
 export default base;

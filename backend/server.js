@@ -11,6 +11,7 @@ const WebSocket = require("ws");
 const { sequelize, Article, Comment, Workspace, ArticleVersion } = require("./models");
 const verifyToken = require("./middleware/auth");
 const authRoutes = require("./routes/auth");
+const usersRoutes = require("./routes/users");
 
 const app = express();
 const PORT = 4000;
@@ -21,6 +22,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 app.use("/auth", authRoutes);
+app.use("/api", usersRoutes);
 
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR);
@@ -111,7 +113,7 @@ app.post("/articles", verifyToken, async (req, res) => {
   if (!title || !content) return res.status(400).json({ error: "Title and content are required." });
   const { workspaceId } = req.body;
   try {
-    const attrs = { title, content, attachments: [] };
+    const attrs = { title, content, attachments: [], userId: req.user.id };
     if (workspaceId) attrs.workspaceId = workspaceId;
     const article = await Article.create(attrs);
 
@@ -135,6 +137,12 @@ app.put("/articles/:id", verifyToken, async (req, res) => {
   try {
     const article = await Article.findByPk(id);
     if (!article) return res.status(404).json({ error: "Article not found." });
+
+    const isCreator = article.userId === req.user.id;
+    const isAdmin = req.user.role === 'admin';
+    if (!isCreator && !isAdmin) {
+      return res.status(403).json({ error: "You can only edit your own articles." });
+    }
 
     if (req.query.versionId) return res.status(400).json({ error: 'Cannot edit a historical version' });
 

@@ -20,6 +20,10 @@ module.exports = {
         type: Sequelize.JSON,
         defaultValue: []
       },
+      userId: {
+        type: Sequelize.UUID,
+        allowNull: true,
+      },
       createdAt: {
         type: Sequelize.DATE,
         allowNull: false,

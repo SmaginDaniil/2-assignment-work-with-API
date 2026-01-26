@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
+import { AuthContext } from "../contexts/AuthContext";
 import { getArticle, getArticleVersion, getArticleVersions, updateArticle, uploadMultiple, getComments, postComment } from "../services/api";
 
 function ArticleView({ articleId, refreshKey = 0 }) {
+  const { user } = useContext(AuthContext);
   const [article, setArticle] = useState(null);
   const [versions, setVersions] = useState([]);
   const [selectedVersionId, setSelectedVersionId] = useState(null);
@@ -49,6 +51,12 @@ function ArticleView({ articleId, refreshKey = 0 }) {
 
   const startEdit = () => {
     if (article.isCurrent === false) return;
+    const isCreator = article.userId === user?.id;
+    const isAdmin = user?.role === 'admin';
+    if (!isCreator && !isAdmin) {
+      setError("You can only edit your own articles.");
+      return;
+    }
     setIsEditing(true);
     setEditTitle(article.title);
     setEditContent(article.version ? article.version.content : article.content);
@@ -99,7 +107,10 @@ function ArticleView({ articleId, refreshKey = 0 }) {
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
         <h2 style={{ margin: 0 }}>{article.title}</h2>
         {article.Workspace && <div style={{ color: '#6b7280', fontSize: 14 }}>in {article.Workspace.name}</div>}
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, alignItems: 'center' }}>
+          {article.userId && (
+            <div style={{ fontSize: 12, color: '#6b7280' }}>Created by user</div>
+          )}
           <select value={selectedVersionId || ''} onChange={async (e) => {
             const vId = e.target.value || null;
             setSelectedVersionId(vId);

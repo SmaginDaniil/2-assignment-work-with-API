@@ -20,10 +20,10 @@ router.post('/register', async (req, res) => {
       return res.status(409).json({ error: 'User with this email already exists.' });
     }
 
-    const user = await User.create({ email, password });
+    const user = await User.create({ email, password, role: 'user' });
 
     const token = jwt.sign(
-      { id: user.id, email: user.email },
+      { id: user.id, email: user.email, role: user.role },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRE }
     );
@@ -31,7 +31,7 @@ router.post('/register', async (req, res) => {
     res.status(201).json({
       message: 'User registered successfully.',
       token,
-      user: { id: user.id, email: user.email },
+      user: { id: user.id, email: user.email, role: user.role },
     });
   } catch (err) {
     console.error('Registration error:', err);
@@ -59,7 +59,7 @@ router.post('/login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email },
+      { id: user.id, email: user.email, role: user.role },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRE }
     );
@@ -67,7 +67,7 @@ router.post('/login', async (req, res) => {
     res.json({
       message: 'Login successful.',
       token,
-      user: { id: user.id, email: user.email },
+      user: { id: user.id, email: user.email, role: user.role },
     });
   } catch (err) {
     console.error('Login error:', err);

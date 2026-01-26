@@ -9,8 +9,10 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const savedToken = localStorage.getItem("token");
-    if (savedToken) {
+    const savedUser = localStorage.getItem("user");
+    if (savedToken && savedUser) {
       setToken(savedToken);
+      setUser(JSON.parse(savedUser));
     }
     setLoading(false);
   }, []);
@@ -29,6 +31,7 @@ export function AuthProvider({ children }) {
       setToken(data.token);
       setUser(data.user);
       localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
       return data;
     } catch (err) {
       throw err;
@@ -49,6 +52,7 @@ export function AuthProvider({ children }) {
       setToken(data.token);
       setUser(data.user);
       localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
       return data;
     } catch (err) {
       throw err;
@@ -59,6 +63,7 @@ export function AuthProvider({ children }) {
     setToken(null);
     setUser(null);
     localStorage.removeItem("token");
+    localStorage.removeItem("user");
   };
 
   return (

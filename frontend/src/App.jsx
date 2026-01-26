@@ -8,13 +8,15 @@ import ArticleList from "./components/ArticleList";
 import ArticleView from "./components/ArticleView";
 import ArticleForm from "./components/ArticleForm";
 import Workspaces from "./components/Workspaces";
+import UserManagement from "./components/UserManagement";
 
 function MainApp() {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [notifications, setNotifications] = useState([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState(null);
-  const { logout } = useContext(AuthContext);
+  const [showUserMgmt, setShowUserMgmt] = useState(false);
+  const { logout, user } = useContext(AuthContext);
 
   useEffect(() => {
     const ws = new WebSocket("ws://localhost:4000");
@@ -50,27 +52,39 @@ function MainApp() {
       <button onClick={logout} style={{ position: "absolute", top: 10, right: 10 }}>
         Logout
       </button>
-      <div className="app-grid">
-        <div className="panel">
-          <Workspaces selectedId={selectedWorkspace} onSelect={(id) => setSelectedWorkspace(id)} />
-          <div style={{ marginTop: 12 }}>
-            <ArticleList key={`${refreshKey}-${selectedWorkspace||''}`} workspaceId={selectedWorkspace} onSelectArticle={(id) => setSelectedArticle(id)} />
+      {user?.role === 'admin' && (
+        <button 
+          onClick={() => setShowUserMgmt(!showUserMgmt)} 
+          style={{ position: "absolute", top: 10, right: 120 }}
+        >
+          {showUserMgmt ? 'Hide' : 'User Mgmt'}
+        </button>
+      )}
+      {showUserMgmt && user?.role === 'admin' ? (
+        <UserManagement />
+      ) : (
+        <div className="app-grid">
+          <div className="panel">
+            <Workspaces selectedId={selectedWorkspace} onSelect={(id) => setSelectedWorkspace(id)} />
+            <div style={{ marginTop: 12 }}>
+              <ArticleList key={`${refreshKey}-${selectedWorkspace||''}`} workspaceId={selectedWorkspace} onSelectArticle={(id) => setSelectedArticle(id)} />
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <ArticleForm onArticleCreated={() => setRefreshKey((k) => k + 1)} workspaceId={selectedWorkspace} />
+            </div>
           </div>
-          <div style={{ marginTop: 12 }}>
-            <ArticleForm onArticleCreated={() => setRefreshKey((k) => k + 1)} workspaceId={selectedWorkspace} />
+          <div className="panel">
+            <div className="notifications">
+              {notifications.map((n, i) => (
+                <div key={i} className="notification">
+                  <strong>{n.type}</strong>: {n.message}
+                </div>
+              ))}
+            </div>
+            <ArticleView articleId={selectedArticle} refreshKey={refreshKey} />
           </div>
         </div>
-        <div className="panel">
-          <div className="notifications">
-            {notifications.map((n, i) => (
-              <div key={i} className="notification">
-                <strong>{n.type}</strong>: {n.message}
-              </div>
-            ))}
-          </div>
-          <ArticleView articleId={selectedArticle} refreshKey={refreshKey} />
-        </div>
-      </div>
+      )}
     </div>
   );
 }
