@@ -81,7 +81,9 @@ export default function UserManagement() {
               <td style={styles.td}>{u.role}</td>
               <td style={styles.td}>{new Date(u.createdAt).toLocaleDateString()}</td>
               <td style={styles.td}>
-                {u.role === 'admin' ? (
+                {u.id === user.id ? (
+                  <span style={{ color: '#6b7280', fontSize: 13 }}>Cannot change own role</span>
+                ) : (u.role === 'admin' ? (
                   <button
                     onClick={() => handleRoleChange(u.id, 'user')}
                     style={styles.buttonDanger}
@@ -95,7 +97,7 @@ export default function UserManagement() {
                   >
                     Promote to Admin
                   </button>
-                )}
+                ))}
               </td>
             </tr>
           ))}

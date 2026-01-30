@@ -9,6 +9,7 @@ const multer = require("multer");
 const http = require("http");
 const WebSocket = require("ws");
 const { sequelize, Article, Comment, Workspace, ArticleVersion } = require("./models");
+const roles = require('./constants/roles');
 const verifyToken = require("./middleware/auth");
 const authRoutes = require("./routes/auth");
 const usersRoutes = require("./routes/users");
@@ -91,6 +92,7 @@ app.get("/articles/:id", verifyToken, async (req, res) => {
         id: article.id,
         title: version.title,
         workspaceId: article.workspaceId,
+        userId: article.userId,
         version: { id: version.id, number: version.version, content: version.content, attachments: version.attachments, createdAt: version.createdAt },
         isCurrent: false,
         Comments: article.Comments || []
@@ -98,7 +100,7 @@ app.get("/articles/:id", verifyToken, async (req, res) => {
     }
     const latest = await ArticleVersion.findOne({ where: { articleId: article.id }, order: [['version', 'DESC']] });
     if (latest) {
-      return res.json({ id: article.id, title: latest.title, workspaceId: article.workspaceId, version: { id: latest.id, number: latest.version, content: latest.content, attachments: latest.attachments, createdAt: latest.createdAt }, isCurrent: true, Comments: article.Comments || [] });
+      return res.json({ id: article.id, title: latest.title, workspaceId: article.workspaceId, userId: article.userId, version: { id: latest.id, number: latest.version, content: latest.content, attachments: latest.attachments, createdAt: latest.createdAt }, isCurrent: true, Comments: article.Comments || [] });
     }
 
     res.json(article);
@@ -139,7 +141,7 @@ app.put("/articles/:id", verifyToken, async (req, res) => {
     if (!article) return res.status(404).json({ error: "Article not found." });
 
     const isCreator = article.userId === req.user.id;
-    const isAdmin = req.user.role === 'admin';
+    const isAdmin = req.user.role === roles.ADMIN;
     if (!isCreator && !isAdmin) {
       return res.status(403).json({ error: "You can only edit your own articles." });
     }

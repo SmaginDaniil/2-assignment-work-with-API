@@ -18,13 +18,19 @@ router.get('/users', verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
+const roles = require('../constants/roles');
+
 router.put('/users/:id/role', verifyToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { role } = req.body;
 
-    if (!role || !['admin', 'user'].includes(role)) {
+    if (!role || !roles.ALL.includes(role)) {
       return res.status(400).json({ error: 'Invalid role. Must be admin or user.' });
+    }
+
+    if (req.user.id === id) {
+      return res.status(403).json({ error: 'You cannot change your own role.' });
     }
 
     const user = await User.findByPk(id);

@@ -2,20 +2,33 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.addColumn('Users', 'role', {
-      type: Sequelize.ENUM('admin', 'user'),
-      allowNull: false,
-      defaultValue: 'user',
-    });
+    const usersDesc = await queryInterface.describeTable('Users').catch(() => null);
+    if (usersDesc && !usersDesc.role) {
+      await queryInterface.addColumn('Users', 'role', {
+        type: Sequelize.ENUM('admin', 'user'),
+        allowNull: false,
+        defaultValue: 'user',
+      });
+    }
 
-    await queryInterface.addColumn('articles', 'userId', {
-      type: Sequelize.UUID,
-      allowNull: true,
-    });
+    const articlesDesc = await queryInterface.describeTable('articles').catch(() => null);
+    if (articlesDesc && !articlesDesc.userId) {
+      await queryInterface.addColumn('articles', 'userId', {
+        type: Sequelize.UUID,
+        allowNull: true,
+      });
+    }
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.removeColumn('Users', 'role');
-    await queryInterface.removeColumn('articles', 'userId');
+    const usersDesc = await queryInterface.describeTable('Users').catch(() => null);
+    if (usersDesc && usersDesc.role) {
+      await queryInterface.removeColumn('Users', 'role');
+    }
+
+    const articlesDesc = await queryInterface.describeTable('articles').catch(() => null);
+    if (articlesDesc && articlesDesc.userId) {
+      await queryInterface.removeColumn('articles', 'userId');
+    }
   }
 };
