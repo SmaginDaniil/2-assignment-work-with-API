@@ -71,6 +71,34 @@ app.get("/articles", verifyToken, async (req, res) => {
   try {
     const where = {};
     if (req.query.workspaceId) where.workspaceId = req.query.workspaceId;
+
+    if (req.query.search) {
+      const { Op } = sequelize.Sequelize;
+      const search = req.query.search;
+      const lower = `%${search.toLowerCase()}%`;
+
+      const matchedVersions = await ArticleVersion.findAll({
+        attributes: ["articleId"],
+        where: {
+          [Op.or]: [
+            sequelize.Sequelize.where(sequelize.Sequelize.fn('LOWER', sequelize.Sequelize.col('title')), { [Op.like]: lower }),
+            sequelize.Sequelize.where(sequelize.Sequelize.fn('LOWER', sequelize.Sequelize.col('content')), { [Op.like]: lower }),
+          ],
+        },
+        group: ['articleId'],
+      });
+
+      const versionIds = matchedVersions.map((v) => v.articleId);
+
+      where[Op.or] = [
+        sequelize.Sequelize.where(sequelize.Sequelize.fn('LOWER', sequelize.Sequelize.col('title')), { [Op.like]: lower }),
+        sequelize.Sequelize.where(sequelize.Sequelize.fn('LOWER', sequelize.Sequelize.col('content')), { [Op.like]: lower }),
+      ];
+      if (versionIds.length > 0) {
+        where[Op.or].push({ id: { [Op.in]: versionIds } });
+      }
+    }
+
     const articles = await Article.findAll({ where, attributes: ["id", "title", "workspaceId"], order: [["createdAt", "DESC"]] });
     res.json(articles);
   } catch (err) {

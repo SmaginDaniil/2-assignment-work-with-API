@@ -21,13 +21,12 @@ base.interceptors.response.use(
   }
 );
 
-export async function getArticles() {
-  const res = await base.get("/articles");
+export async function getArticles(params = {}) {
+  const res = await base.get("/articles", { params });
   return res.data;
 }
 export async function getArticlesByWorkspace(workspaceId) {
-  const res = await base.get(`/articles`, { params: { workspaceId } });
-  return res.data;
+  return getArticles({ workspaceId });
 }
 
 export async function getArticle(id) {
