@@ -44,6 +44,11 @@ export async function getArticleVersions(articleId) {
   return res.data;
 }
 
+export async function exportArticlePdf(articleId, params = {}) {
+  const res = await base.get(`/articles/${articleId}/export`, { params, responseType: 'arraybuffer' });
+  return res;
+}
+
 export async function createArticle(payload) {
   const res = await base.post(`/articles`, payload);
   return res.data;

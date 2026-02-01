@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from "react";
 import { AuthContext } from "../contexts/AuthContext";
-import { getArticle, getArticleVersion, getArticleVersions, updateArticle, uploadMultiple, getComments, postComment } from "../services/api";
+import { getArticle, getArticleVersion, getArticleVersions, updateArticle, uploadMultiple, getComments, postComment, exportArticlePdf } from "../services/api";
 
 function ArticleView({ articleId, refreshKey = 0 }) {
   const { user } = useContext(AuthContext);
@@ -17,6 +17,7 @@ function ArticleView({ articleId, refreshKey = 0 }) {
   const [filesToUpload, setFilesToUpload] = useState(null);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     const fetchArticle = async () => {
@@ -96,6 +97,61 @@ function ArticleView({ articleId, refreshKey = 0 }) {
     }
   };
 
+  const exportPdf = async () => {
+    try {
+      setExporting(true);
+      setError('');
+      const params = selectedVersionId ? { versionId: selectedVersionId } : {};
+      const res = await exportArticlePdf(articleId, params);
+
+      const contentType = res.headers['content-type'] || '';
+      if (!contentType.includes('application/pdf')) {
+        let msg = 'Failed to export PDF';
+        try {
+          const text = new TextDecoder().decode(res.data);
+          const parsed = JSON.parse(text);
+          msg = parsed.error || text || msg;
+        } catch (e) {
+          try {
+            msg = new TextDecoder().decode(res.data);
+          } catch (ee) {
+          }
+        }
+        setError(msg);
+        console.error('Export PDF error payload:', res.headers, res.data);
+        return;
+      }
+
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const filename = `${(article.title || 'article').replace(/[\\/:"*?<>|]/g, '')}.pdf`;
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export PDF failed', err);
+      let message = 'Failed to export PDF';
+      if (err.response && err.response.data) {
+        try {
+          const text = new TextDecoder().decode(err.response.data);
+          const parsed = JSON.parse(text);
+          message = parsed.error || text || message;
+        } catch (e) {
+          try { message = new TextDecoder().decode(err.response.data); } catch (ee) {}
+        }
+      } else if (err.message) {
+        message = err.message;
+      }
+      setError(message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="article-view">
       {article && article.isCurrent === false && (
@@ -171,6 +227,7 @@ function ArticleView({ articleId, refreshKey = 0 }) {
 
           <div style={{ marginTop: 12 }}>
             <button onClick={startEdit} style={{ padding: "8px 12px", marginRight: 8 }} disabled={article.isCurrent === false}>Edit</button>
+            <button onClick={exportPdf} style={{ padding: "8px 12px" }} disabled={exporting}>{exporting ? 'Exporting...' : 'Export as PDF'}</button>
           </div>
         </>
       ) : (
